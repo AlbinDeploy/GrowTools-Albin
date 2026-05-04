@@ -401,6 +401,18 @@ function process_item_encoder(result, using_txt) {
                     write_buffer_number(mem_pos, 4, result1[54])
                     mem_pos += 4;
                 }
+                if (version >= 25) {
+                    write_buffer_number(mem_pos, 4, result1[55])
+                    mem_pos += 4;
+                }
+                if (version >= 26) {
+                    write_buffer_number(mem_pos, 4, result1[56])
+                    mem_pos += 4;
+                }
+                if (version >= 27) {
+                    write_buffer_number(mem_pos, 4, result1[57])
+                    mem_pos += 4;
+                }
             }
         }
     } else {
@@ -562,6 +574,18 @@ function process_item_encoder(result, using_txt) {
                 write_buffer_number(mem_pos, 4, result.items[a].int_version_24)
                 mem_pos += 4;
             }
+            if (result.version >= 25) {
+                write_buffer_number(mem_pos, 4, result.items[a].int_version_25)
+                mem_pos += 4;
+            }
+            if (result.version >= 26) {
+                write_buffer_number(mem_pos, 4, result.items[a].int_version_26)
+                mem_pos += 4;
+            }
+            if (result.version >= 27) {
+                write_buffer_number(mem_pos, 4, result.items[a].int_version_27)
+                mem_pos += 4;
+            }
         }
     }
 }
@@ -612,7 +636,7 @@ function item_decoder(file, using_editor) {
         var version = read_buffer_number(arrayBuffer, 0, 2);
         var item_count = read_buffer_number(arrayBuffer, 2, 4);
 
-        if (version > 24) {
+        if (version > 27) {
             return Swal.mixin({
                 toast: true,
                 position: 'top-end',
@@ -822,6 +846,21 @@ function item_decoder(file, using_editor) {
                 mem_pos += 4;
             }
 
+            if (version >= 25) {
+                var int_version_25 = read_buffer_number(arrayBuffer, mem_pos, 4)
+                mem_pos += 4;
+            }
+
+            if (version >= 26) {
+                var int_version_26 = read_buffer_number(arrayBuffer, mem_pos, 4)
+                mem_pos += 4;
+            }
+
+            if (version >= 27) {
+                var int_version_27 = read_buffer_number(arrayBuffer, mem_pos, 4)
+                mem_pos += 4;
+            }
+
             if (item_id != a) console.log(`Unordered Items at ${a}`)
 
             data_json.items[a] = {}
@@ -895,6 +934,9 @@ function item_decoder(file, using_editor) {
             data_json.items[a].str_version_22 = str_version_22
             data_json.items[a].int_version_23 = int_version_23
             data_json.items[a].int_version_24 = int_version_24
+            data_json.items[a].int_version_25 = int_version_25
+            data_json.items[a].int_version_26 = int_version_26
+            data_json.items[a].int_version_27 = int_version_27
         }
         if (using_editor) {
             if (!$.fn.dataTable.isDataTable("#itemsList")) {
@@ -1000,6 +1042,9 @@ function editItems(posArray) {
     document.getElementById("str_version_22").value = data_json.items[posArray].str_version_22
     document.getElementById("int_version_23").value = data_json.items[posArray].int_version_23
     document.getElementById("int_version_24").value = data_json.items[posArray].int_version_24
+    document.getElementById("int_version_25").value = data_json.items[posArray].int_version_25
+    document.getElementById("int_version_26").value = data_json.items[posArray].int_version_26
+    document.getElementById("int_version_27").value = data_json.items[posArray].int_version_27
     document.getElementById("editItemsButton").setAttribute("onclick", `processEditItems(${posArray})`)
 }
 
@@ -1069,5 +1114,8 @@ function processEditItems(posArray) {
     data_json.items[posArray].str_version_22 = document.getElementById("str_version_22").value
     data_json.items[posArray].int_version_23 = document.getElementById("int_version_23").value
     data_json.items[posArray].int_version_24 = document.getElementById("int_version_24").value
+    data_json.items[posArray].int_version_25 = document.getElementById("int_version_25").value
+    data_json.items[posArray].int_version_26 = document.getElementById("int_version_26").value
+    data_json.items[posArray].int_version_27 = document.getElementById("int_version_27").value
     $("#modal-editItems").modal("hide")
 }
