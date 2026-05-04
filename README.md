@@ -3,8 +3,7 @@
 A Growtopia Tools (GrowTools) and Image Tools website.
 
 🌐 Live Website:  
-https://gucktubeyt.github.io/GrowTools  
-Short link: https://bit.ly/gtoolsweb  
+https://growtools.albintsx.site    
 
 ---
 
