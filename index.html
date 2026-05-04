@@ -42,6 +42,12 @@
     />
     <!-- My Custom CSS -->
     <link rel="stylesheet" href="dist/css/mycss.css" />
+    <style>
+      @keyframes pulse-badge {
+        0%, 100% { box-shadow: 0 2px 8px rgba(40,167,69,0.45); }
+        50% { box-shadow: 0 2px 18px rgba(40,167,69,0.85); }
+      }
+    </style>
   </head>
   <body
     class="dark-mode hold-transition sidebar-mini layout-fixed layout-navbar-fixed layout-footer-fixed sidebar-collapse"
@@ -60,6 +66,26 @@
         <ul class="navbar-nav ml-auto">
           <li class="nav-item d-none d-sm-inline-block">
             <a href="https://visitorbadge.io/status?path=https%3A%2F%2Fgithub.com%2FGuckTubeYT%2FGrowTools"><img id="visitor_img"/></a>
+          </li>
+          <li class="nav-item">
+            <span id="v27-badge" style="
+              display: inline-flex;
+              align-items: center;
+              background: linear-gradient(135deg, #28a745, #20c997);
+              color: #fff;
+              font-size: 0.78rem;
+              font-weight: 700;
+              padding: 4px 12px;
+              border-radius: 50px;
+              margin: auto 8px;
+              box-shadow: 0 2px 8px rgba(40,167,69,0.45);
+              letter-spacing: 0.03em;
+              cursor: default;
+              animation: pulse-badge 2s ease-in-out infinite;
+            ">
+              <i class="fas fa-check-circle mr-1" style="font-size:0.85rem;"></i>
+              Support items.dat up to v27
+            </span>
           </li>
         </ul>
       </nav>
@@ -1027,6 +1053,42 @@
                     />
                   </div>
                 </div>
+                <div class="form-group">
+                  <label for="int_version_25">Data Version 25 (int)</label>
+                  <div class="input-group">
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="int_version_25"
+                      placeholder="Data Version 25"
+                      autocomplete="off"
+                    />
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="int_version_26">Data Version 26 (int)</label>
+                  <div class="input-group">
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="int_version_26"
+                      placeholder="Data Version 26"
+                      autocomplete="off"
+                    />
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="int_version_27">Data Version 27 (int)</label>
+                  <div class="input-group">
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="int_version_27"
+                      placeholder="Data Version 27"
+                      autocomplete="off"
+                    />
+                  </div>
+                </div>
               </div>
               <div class="modal-footer justify-content-between">
                 <button
@@ -1162,6 +1224,19 @@
     <script>
       window.onload = function() {
         document.getElementById("visitor_img").src = "https://api.visitorbadge.io/api/visitors?path=https%3A%2F%2Fgithub.com%2FGuckTubeYT%2FGrowTools&countColor=%2337d67a"
+
+        // Toast notif: support v27
+        Swal.mixin({
+          toast: true,
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 4500,
+          timerProgressBar: true,
+        }).fire({
+          icon: 'success',
+          title: '✅ Now supporting items.dat up to <b>v27</b>!',
+          html: 'Decoder & encoder updated for version 25, 26, 27.',
+        });
       }
     </script>
   </body>
