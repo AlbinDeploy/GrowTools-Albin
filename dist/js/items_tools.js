@@ -57,13 +57,19 @@ function hex(arrayBuffer, is_without_space) {
  * @param {ArrayBuffer} buffer
  * @param {number} pos
  * @param {number} len
- * @return {string}
+ * @return {number}
  */
 function read_buffer_number(buffer, pos, len) {
-    let value = 0;
-    for (let a = 0; a < len; a++) value += buffer[pos + a] << (a * 8)
-
-    return value;
+    if (len <= 4) {
+        let value = 0;
+        for (let a = 0; a < len; a++) value += buffer[pos + a] << (a * 8);
+        return value;
+    } else {
+        // Use BigInt for >4 bytes to avoid JS 32-bit bitshift overflow (e.g. int_version_19 = 9 bytes)
+        let value = 0n;
+        for (let a = 0; a < len; a++) value += BigInt(buffer[pos + a]) << BigInt(a * 8);
+        return Number(value);
+    }
 }
 
 /**
@@ -72,8 +78,16 @@ function read_buffer_number(buffer, pos, len) {
  * @param {number} value
  */
 function write_buffer_number(pos, len, value) {
-    for (let a = 0; a < len; a++) {
-        encoded_buffer_file[pos + a] = (value >> (a * 8)) & 255;
+    if (len <= 4) {
+        for (let a = 0; a < len; a++) {
+            encoded_buffer_file[pos + a] = (value >> (a * 8)) & 255;
+        }
+    } else {
+        // Use BigInt for >4 bytes to avoid JS 32-bit bitshift overflow (e.g. int_version_19 = 9 bytes)
+        let bigVal = BigInt(Math.trunc(Number(value) || 0));
+        for (let a = 0; a < len; a++) {
+            encoded_buffer_file[pos + a] = Number((bigVal >> BigInt(a * 8)) & 255n);
+        }
     }
 }
 
@@ -112,6 +126,36 @@ function hexStringToArrayBuffer(pos, hexString) { //https://gist.github.com/don/
     });
 
     return integers
+}
+
+/**
+ * Escape special characters in string fields when exporting to TXT format.
+ * Prevents newlines and backslashes from breaking the \-delimited TXT parser.
+ * @param {any} v
+ * @return {string}
+ */
+function txt_escape(v) {
+    if (v === undefined || v === null) return '';
+    return String(v)
+        .replace(/\[/g,  '[LS]')   // escape [ first so our tokens don't get double-escaped
+        .replace(/\\/g,  '[BS]')   // backslash → [BS]
+        .replace(/\r\n/g,'[CRNL]') // CRLF → [CRNL]
+        .replace(/\r/g,  '[CR]')   // CR → [CR]
+        .replace(/\n/g,  '[NL]');  // LF → [NL]
+}
+
+/**
+ * Unescape special characters in string fields when importing from TXT format.
+ * @param {string} v
+ * @return {string}
+ */
+function txt_unescape(v) {
+    return v
+        .replace(/\[CRNL\]/g, '\r\n')
+        .replace(/\[NL\]/g,   '\n')
+        .replace(/\[CR\]/g,   '\r')
+        .replace(/\[BS\]/g,   '\\')
+        .replace(/\[LS\]/g,   '[');
 }
 
 /**
@@ -184,6 +228,8 @@ function process_item_encoder(result, using_txt) {
 
         for (let a = 0; a < result.length; a++) {
             var result1 = result[a].split("\\")
+            // Unescape special chars (newlines, backslashes) that were escaped during export
+            result1 = result1.map(function(v) { return txt_unescape(v); });
             if (result1[0] == "version") {
                 version = Number(result1[1])
                 write_buffer_number(0, 2, Number(result1[1]))
@@ -771,93 +817,101 @@ function item_decoder(file, using_editor) {
             var data_position_80 = hex(arrayBuffer.slice(mem_pos, mem_pos + 80), document.getElementById("using_txt_mode").checked).toUpperCase()
             mem_pos += 80;
 
+            // Default values for ALL version-conditional fields (prevents undefined in TXT export)
+            var punch_options = "", data_version_12 = "", int_version_13 = 0, int_version_14 = 0;
+            var data_version_15 = "", str_version_15 = "", str_version_16 = "";
+            var int_version_17 = 0, int_version_18 = 0, int_version_19 = 0;
+            var int_version_21 = 0, str_version_22 = "";
+            var int_version_23 = 0, int_version_24 = 0;
+            var int_version_25 = 0, int_version_26 = 0, int_version_27 = 0;
+
             if (version >= 11) {
                 len = read_buffer_number(arrayBuffer, mem_pos, 2)
                 mem_pos += 2;
-                var punch_options = read_buffer_string(arrayBuffer, mem_pos, len);
+                punch_options = read_buffer_string(arrayBuffer, mem_pos, len);
                 mem_pos += len;
             }
 
             if (version >= 12) {
-                var data_version_12 = hex(arrayBuffer.slice(mem_pos, mem_pos + 13), document.getElementById("using_txt_mode").checked).toUpperCase()
+                data_version_12 = hex(arrayBuffer.slice(mem_pos, mem_pos + 13), document.getElementById("using_txt_mode").checked).toUpperCase()
                 mem_pos += 13;
             }
 
             if (version >= 13) {
-                var int_version_13 = read_buffer_number(arrayBuffer, mem_pos, 4)
+                int_version_13 = read_buffer_number(arrayBuffer, mem_pos, 4)
                 mem_pos += 4;
             }
 
             if (version >= 14) {
-                var int_version_14 = read_buffer_number(arrayBuffer, mem_pos, 4)
+                int_version_14 = read_buffer_number(arrayBuffer, mem_pos, 4)
                 mem_pos += 4;
             }
 
             if (version >= 15) {
-                var data_version_15 = hex(arrayBuffer.slice(mem_pos, mem_pos + 25), document.getElementById("using_txt_mode").checked).toUpperCase()
+                data_version_15 = hex(arrayBuffer.slice(mem_pos, mem_pos + 25), document.getElementById("using_txt_mode").checked).toUpperCase()
                 mem_pos += 25;
 
                 len = read_buffer_number(arrayBuffer, mem_pos, 2);
                 mem_pos += 2;
-                var str_version_15 = read_buffer_string(arrayBuffer, mem_pos, len);
+                str_version_15 = read_buffer_string(arrayBuffer, mem_pos, len);
                 mem_pos += len
             }
             if (version >= 16) {
                 len = read_buffer_number(arrayBuffer, mem_pos, 2)
                 mem_pos += 2;
-                var str_version_16 = read_buffer_string(arrayBuffer, mem_pos, len);
+                str_version_16 = read_buffer_string(arrayBuffer, mem_pos, len);
                 mem_pos += len
             }
 
             if (version >= 17) {
-                var int_version_17 = read_buffer_number(arrayBuffer, mem_pos, 4)
+                int_version_17 = read_buffer_number(arrayBuffer, mem_pos, 4)
                 mem_pos += 4;
             }
 
             if (version >= 18) {
-                var int_version_18 = read_buffer_number(arrayBuffer, mem_pos, 4)
+                int_version_18 = read_buffer_number(arrayBuffer, mem_pos, 4)
                 mem_pos += 4;
             }
 
             if (version >= 19) {
-                var int_version_19 = read_buffer_number(arrayBuffer, mem_pos, 9)
+                int_version_19 = read_buffer_number(arrayBuffer, mem_pos, 9)
                 mem_pos += 9;
             }
 
             if (version >= 21) {
-                var int_version_21 = read_buffer_number(arrayBuffer, mem_pos, 2)
+                int_version_21 = read_buffer_number(arrayBuffer, mem_pos, 2)
                 mem_pos += 2;
             }
 
             if (version >= 22) {
                 len = read_buffer_number(arrayBuffer, mem_pos, 2)
                 mem_pos += 2;
-                var str_version_22 = read_buffer_string(arrayBuffer, mem_pos, len);
+                str_version_22 = read_buffer_string(arrayBuffer, mem_pos, len);
                 mem_pos += len
             }
 
             if (version >= 23) {
-                var int_version_23 = read_buffer_number(arrayBuffer, mem_pos, 4)
+                int_version_23 = read_buffer_number(arrayBuffer, mem_pos, 4)
                 mem_pos += 4;
             }
 
             if (version >= 24) {
-                var int_version_24 = read_buffer_number(arrayBuffer, mem_pos, 4)
+                int_version_24 = read_buffer_number(arrayBuffer, mem_pos, 4)
                 mem_pos += 4;
             }
 
             if (version >= 25) {
-                var int_version_25 = read_buffer_number(arrayBuffer, mem_pos, 4)
+                int_version_25 = read_buffer_number(arrayBuffer, mem_pos, 4)
                 mem_pos += 4;
             }
 
             if (version >= 26) {
-                var int_version_26 = read_buffer_number(arrayBuffer, mem_pos, 4)
+                int_version_26 = read_buffer_number(arrayBuffer, mem_pos, 4)
                 mem_pos += 4;
             }
 
             if (version >= 27) {
-                var int_version_27 = read_buffer_number(arrayBuffer, mem_pos, 4)
+                int_version_27 = read_buffer_number(arrayBuffer, mem_pos, 4)
                 mem_pos += 4;
             }
 
@@ -978,7 +1032,13 @@ function item_decoder(file, using_editor) {
         } else {
             if (document.getElementById("using_txt_mode").checked) {
                 var to_txt_result = `//Credit: IProgramInCPP & GrowtopiaNoobs\n//Format: add_item\\${Object.keys(data_json.items[0]).join("\\")}\n//NOTE: There are several items, for the breakhits part, add 'r'.\n//Example: 184r\n//What does it mean? So, adding 'r' to breakhits makes it raw breakhits, meaning, if you add 'r' to breakhits, when encoding items.dat, the encoder won't multiply it by 6.\n\nversion\\${data_json.version}\nitemCount\\${data_json.item_count}\n\n`;
-                for (let a = 0; a < item_count; a++) to_txt_result += "add_item\\" + Object.values(data_json.items[a]).join("\\") + "\n"
+                for (let a = 0; a < item_count; a++) {
+                    // Use txt_escape on each field value to prevent newlines/backslashes in
+                    // string fields (e.g. str_version_22 item descriptions) from breaking
+                    // the \-delimited line format — fix for v22-27 garbled TXT output bug
+                    var escaped_vals = Object.values(data_json.items[a]).map(function(v) { return txt_escape(v); });
+                    to_txt_result += "add_item\\" + escaped_vals.join("\\") + "\n";
+                }
                 saveData(to_txt_result, "items.txt")
             } else saveData(JSON.stringify(data_json, null, 4), "items.json");
             data_json = {}
