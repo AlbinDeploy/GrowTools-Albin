@@ -459,6 +459,11 @@ function process_item_encoder(result, using_txt) {
                     write_buffer_number(mem_pos, 4, result1[57])
                     mem_pos += 4;
                 }
+                // Re-emit unknown bytes (result1[58]) for version > 27 — lossless round-trip
+                if (result1[58] && result1[58].length > 0) {
+                    hexStringToArrayBuffer(mem_pos, result1[58]);
+                    mem_pos += Math.ceil(result1[58].replace(/\s/g,'').length / 2);
+                }
             }
         }
     } else {
@@ -632,6 +637,11 @@ function process_item_encoder(result, using_txt) {
                 write_buffer_number(mem_pos, 4, result.items[a].int_version_27)
                 mem_pos += 4;
             }
+            // Re-emit unknown bytes captured from version > 27 fields (lossless round-trip)
+            if (result.items[a].extra_unknown && result.items[a].extra_unknown.length > 0) {
+                hexStringToArrayBuffer(mem_pos, result.items[a].extra_unknown);
+                mem_pos += Math.ceil(result.items[a].extra_unknown.replace(/\s/g,'').length / 2);
+            }
         }
     }
 }
@@ -683,14 +693,14 @@ function item_decoder(file, using_editor) {
         var item_count = read_buffer_number(arrayBuffer, 2, 4);
 
         if (version > 27) {
-            return Swal.mixin({
+            Swal.mixin({
                 toast: true,
                 position: 'top-end',
                 showConfirmButton: false,
-                timer: 3000
+                timer: 5000
             }).fire({
-                icon: 'error',
-                title: "Your items.dat version is " + version + ", and This decoder doesnt support that version!"
+                icon: 'warning',
+                title: "items.dat v" + version + " detected. Fields beyond v27 will be stored as raw hex (extra_unknown). Decode may be partial."
             })
         }
         data_json.version = version
@@ -698,6 +708,8 @@ function item_decoder(file, using_editor) {
         data_json.items = []
 
         for (let a = 0; a < item_count; a++) {
+          try {
+            var item_start_pos = mem_pos;
             var item_id = read_buffer_number(arrayBuffer, mem_pos, 4);
             mem_pos += 4;
 
@@ -991,6 +1003,42 @@ function item_decoder(file, using_editor) {
             data_json.items[a].int_version_25 = int_version_25
             data_json.items[a].int_version_26 = int_version_26
             data_json.items[a].int_version_27 = int_version_27
+
+            // For versions > 27: capture any remaining unknown bytes per item as raw hex
+            // so no data is lost and re-encoding still works perfectly
+            if (version > 27 && mem_pos < arrayBuffer.length) {
+                // Peek ahead: estimate next item's item_id start by scanning for the next
+                // valid-looking 4-byte item_id (a+1) in the stream. If the stream runs out, capture remainder.
+                var next_expected_id = a + 1;
+                var scan_limit = Math.min(mem_pos + 256, arrayBuffer.length - 4);
+                var found_next = false;
+                for (var sp = mem_pos; sp < scan_limit; sp++) {
+                    var peek_id = read_buffer_number(arrayBuffer, sp, 4);
+                    if (peek_id === next_expected_id && a < item_count - 1) {
+                        if (sp > mem_pos) {
+                            data_json.items[a].extra_unknown = hex(arrayBuffer.slice(mem_pos, sp), true).toUpperCase();
+                        } else {
+                            data_json.items[a].extra_unknown = "";
+                        }
+                        mem_pos = sp;
+                        found_next = true;
+                        break;
+                    }
+                }
+                if (!found_next) {
+                    data_json.items[a].extra_unknown = "";
+                }
+            } else {
+                data_json.items[a].extra_unknown = "";
+            }
+          } catch (item_err) {
+            console.error("Error decoding item " + a + " at pos " + mem_pos + ":", item_err);
+            // Stop decoding at this item - store what we have
+            data_json.item_count = a;
+            Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 5000 })
+                .fire({ icon: 'warning', title: "Decoded " + a + "/" + item_count + " items. Item " + a + " caused an error (version too new?)." });
+            break;
+          }
         }
         if (using_editor) {
             if (!$.fn.dataTable.isDataTable("#itemsList")) {
